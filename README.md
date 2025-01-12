@@ -1,4 +1,4 @@
-# EpargnChain - Déploiement Netlify
+# EpargnChain 
 
 Ce dossier contient les fichiers nécessaires pour le déploiement de l'application EpargnChain sur Netlify.
 
