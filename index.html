@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpargnChain - DeFi Savings Platform</title>
+    
+    <!-- Styles -->
+    <link href="./css/output.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css">
+    
+    <!-- Dépendances externes -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js" type="application/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.1/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Configuration et ABIs -->
+    <script src="./js/config.js"></script>
+    <script src="./js/abis/usdt-abi.js"></script>
+    <script src="./js/abis/savings-v3-abi.js"></script>
+    <script src="./js/abis/vass-abi.js"></script>
+    
+    <!-- Services -->
+    <script src="./js/notifications.js"></script>
+    <script src="./js/wallet-connect.js"></script>
+    <script src="./js/balance-service.js"></script>
+    <script src="./js/chart-service.js"></script>
+    <script src="./js/mini-charts.js"></script>
+    <script src="./js/minimum-amounts-service.js"></script>
+    <script src="./js/price-service.js"></script>
+    <script src="./js/apy-chart-service.js"></script>
+    <script src="./js/savings-service.js"></script>
+    <script src="./js/savings-handler.js"></script>
+    <script src="./js/savings-cards-manager.js"></script>
+    
+    <!-- Application -->
+    <script src="./js/app-v3.js"></script>
+
+    <style>
+        .btn-primary {
+            @apply bg-gradient-to-r from-primary-500 to-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:from-primary-600 hover:to-primary-700 transition-all duration-200 flex items-center text-sm;
+        }
+        .btn-secondary {
+            @apply bg-dark-700 text-white px-4 py-2 rounded-lg font-medium hover:bg-dark-600 transition-all duration-200 flex items-center text-sm;
+        }
+        .calculator-toggle {
+            @apply fixed bottom-6 right-6 bg-gradient-to-r from-primary-500 to-primary-600 text-white p-3 rounded-full shadow-lg hover:scale-110 transition-all duration-200 z-50;
+        }
+        .calculator-modal {
+            @apply fixed inset-0 bg-black/50 flex items-center justify-center z-50 opacity-0 pointer-events-none transition-opacity duration-200;
+        }
+        .calculator-modal.active {
+            @apply opacity-100 pointer-events-auto;
+        }
+        .calculator-content {
+            @apply bg-dark-800 rounded-xl p-6 w-full max-w-md transform scale-95 transition-transform duration-200;
+        }
+        .calculator-modal.active .calculator-content {
+            @apply scale-100;
+        }
+        .hover-scale {
+            transition: transform 0.2s;
+        }
+
+        .hover-scale:hover {
+            transform: scale(1.02);
+        }
+
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 50px;
+            width: 100%;
+        }
+        
+        /* Widget Calculateur */
+        .calculator-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+
+        .calculator-toggle {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #FFB237 0%, #FFD696 100%);
+            border: none;
+            color: #633001;
+            box-shadow: 0 4px 15px rgba(255, 178, 55, 0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .calculator-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(255, 178, 55, 0.4);
+        }
+
+        .calculator-panel {
+            position: absolute;
+            bottom: 70px;
+            right: 0;
+            width: 320px;
+            background: linear-gradient(135deg, #27262C 0%, #1D1C21 100%);
+            border: 1px solid rgba(255, 178, 55, 0.2);
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+
+        .calculator-panel.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .calculator-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 178, 55, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 178, 55, 0.05);
+            border-radius: 24px 24px 0 0;
+        }
+
+        .calculator-header h3 {
+            color: #FFB237;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .close-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 178, 55, 0.1);
+            color: #FFB237;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 178, 55, 0.2);
+            transform: rotate(90deg);
+        }
+
+        .calculator-content {
+            padding: 20px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #9CA3AF;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper input,
+        .input-wrapper select {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 178, 55, 0.1);
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        .input-wrapper input:focus,
+        .input-wrapper select:focus {
+            outline: none;
+            border-color: #FFB237;
+            box-shadow: 0 0 0 2px rgba(255, 178, 55, 0.1);
+        }
+
+        .input-wrapper select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23FFB237' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px;
+            padding-right: 40px;
+        }
+
+        .results {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 178, 55, 0.1);
+        }
+
+        .results h4 {
+            color: #FFB237;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .grid-cols-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .col-span-2 {
+            grid-column: span 2;
+        }
+
+        .text-sm {
+            font-size: 0.875rem;
+        }
+
+        .text-xl {
+            font-size: 1.25rem;
+        }
+
+        .font-bold {
+            font-weight: 700;
+        }
+
+        .text-gray-400 {
+            color: #9CA3AF;
+        }
+
+        .text-primary-400 {
+            color: #FFB237;
+        }
+
+        .text-green-400 {
+            color: #34D399;
+        }
+
+        .text-yellow-400 {
+            color: #FFB237;
+        }
+        
+        /* Animation pour le résultat */
+        @keyframes calculate {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        #calcResult.calculating {
+            animation: calculate 0.2s ease-out;
+        }
+
+        .hand-animation {
+            animation: depositHand 2s ease-in-out infinite;
+            transform-origin: center;
+        }
+
+        .coin {
+            animation: dropCoin 2s ease-in-out infinite;
+            transform-origin: center;
+        }
+
+        @keyframes depositHand {
+            0% {
+                transform: translateY(0) rotate(0deg);
+            }
+            50% {
+                transform: translateY(4px) rotate(5deg);
+            }
+            100% {
+                transform: translateY(0) rotate(0deg);
+            }
+        }
+
+        @keyframes dropCoin {
+            0% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+            50% {
+                transform: translateY(8px);
+                opacity: 0.5;
+            }
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        #calculatorToggle {
+            animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-dark-900 to-dark-800 text-white min-h-screen font-sans">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="glass-effect">
+            <div class="flex items-center space-x-3">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                <span class="text-lg">Chargement...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contract Status -->
+    <div id="contractStatus" class="fixed top-4 right-4 text-sm font-medium px-3 py-1 rounded-full bg-dark-700 z-50"></div>
+
+    <!-- Admin Panel -->
+    <div id="adminControls" class="fixed top-16 right-4 glass-effect p-4 hidden z-50">
+        <div class="space-y-4">
+            <div class="flex space-x-2">
+                <button id="pauseContract" class="btn-secondary bg-red-500">Pause</button>
+                <button id="unpauseContract" class="btn-secondary bg-green-500">Unpause</button>
+            </div>
+            <form id="updateMinAmountForm" class="flex space-x-2">
+                <input type="number" id="newMinAmount" class="flex-1 px-3 py-1 bg-dark-700 rounded"
+                       placeholder="Min amount" step="0.01" min="0" required>
+                <button type="submit" class="btn-primary">Update</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="glass-effect fixed w-full z-50 px-4 py-3">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="ph-fill ph-wallet text-primary-400 text-2xl"></i>
+                <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-primary-600">
+                    EpargnChain
+                </span>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <button id="connectWalletBtn" class="btn-primary" style="display: inline-flex;">
+                    <i class="ph-fill ph-plug mr-2"></i>
+                    Connecter Wallet
+                </button>
+                <span id="walletAddress" style="display: none;" class="text-sm font-medium bg-dark-700 px-4 py-2 rounded-lg"></span>
+                <button id="disconnectWalletBtn" class="btn-primary" style="display: none;">
+                    <i class="ph-fill ph-sign-out mr-2"></i>
+                    Déconnecter
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto pt-24 px-4 max-w-[1440px]">
+<!-- Minimum Amounts Section -->
+<div class="glass-effect mb-4">
+    <div class="flex justify-between items-center mb-2">
+        <div class="flex items-center space-x-2">
+            <i class="ph-fill ph-currency-circle-dollar text-xl text-primary-400"></i>
+            <h2 class="text-lg font-bold">Montants Minimums</h2>
+        </div>
+        <i class="ph-fill ph-piggy-bank text-xl text-primary-400"></i>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="p-3 bg-dark-700 rounded-lg">
+            <p class="text-xs text-gray-400 mb-1">Épargne Individuelle</p>
+            <p id="minSavingsAmount" class="text-base font-medium">-</p>
+        </div>
+        <div class="p-3 bg-dark-700 rounded-lg">
+            <p class="text-xs text-gray-400 mb-1">Épargne de Groupe</p>
+            <p id="minGroupSavingsAmount" class="text-base font-medium">-</p>
+        </div>
+    </div>
+</div>        <!-- Stats Dashboard -->
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- BNB Balance Card -->
+            <div class="glass-effect hover-scale">
+                <div class="flex items-center space-x-3 mb-4">
+                    <i class="ph-fill ph-currency-circle-dollar text-2xl text-yellow-400"></i>
+                    <h3 class="font-bold">Solde BNB</h3>
+                </div>
+                <p class="text-2xl font-bold mb-2"><span id="bnbBalance">0.00</span> BNB</p>
+                <p class="text-sm text-gray-400 mb-2">≈ $<span id="bnbValue">0.00</span></p>
+                <div class="chart-container">
+                    <canvas id="bnbMiniChart"></canvas>
+                </div>
+            </div>
+
+            <!-- VASS Balance Card -->
+            <div class="glass-effect hover-scale">
+                <div class="flex items-center space-x-3 mb-4">
+                    <i class="ph-fill ph-coins text-2xl text-primary-400"></i>
+                    <h3 class="font-bold">Solde VASS</h3>
+                </div>
+                <p class="text-2xl font-bold mb-2"><span id="vassBalance">0.00</span> VASS</p>
+                <p class="text-sm text-gray-400 mb-2">≈ $<span id="vassValue">0.00</span></p>
+                <div class="chart-container">
+                    <canvas id="vassMiniChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Total Savings Card -->
+            <div class="glass-effect hover-scale">
+                <div class="flex items-center space-x-3 mb-4">
+                    <i class="ph-fill ph-piggy-bank text-2xl text-green-400"></i>
+                    <h3 class="font-bold">Total Épargné</h3>
+                </div>
+                <p class="text-2xl font-bold mb-2"><span id="totalSavings">0.00</span> VASS</p>
+                <p class="text-sm text-gray-400 mb-2">Dans <span id="activeSavingsCount">0</span> épargnes actives</p>
+                <div class="chart-container">
+                    <canvas id="savingsMiniChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Total Rewards Card -->
+            <div class="glass-effect hover-scale">
+                <div class="flex items-center space-x-3 mb-4">
+                    <i class="ph-fill ph-gift text-2xl text-purple-400"></i>
+                    <h3 class="font-bold">Récompenses</h3>
+                </div>
+                <p class="text-2xl font-bold mb-2"><span id="totalRewards">0.00</span> VASS</p>
+                <p class="text-sm text-gray-400 mb-2">APY: <span id="currentAPY">0.00</span>%</p>
+                <div class="chart-container">
+                    <canvas id="rewardsMiniChart"></canvas>
+                </div>
+            </div>
+        </section>
+        <!-- Main Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Create Savings Section -->
+            <section class="glass-effect">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold">Créer une Épargne</h2>
+                    <i class="ph-fill ph-plus-circle text-primary-400 text-xl"></i>
+                </div>
+
+                <form id="createSavingsForm" class="space-y-4">
+                    <div class="input-wrapper">
+                        <label for="savingsAmount">Montant (VASS)</label>
+                        <input type="number" id="savingsAmount" min="5" step="0.1" placeholder="Minimum 5 VASS" required>
+                    </div>
+                    <div class="input-wrapper">
+                        <label for="savingsDuration">Durée (mois)</label>
+                        <select id="savingsDuration" required>
+                            <option value="1">1 mois</option>
+                            <option value="3">3 mois</option>
+                            <option value="6">6 mois</option>
+                            <option value="12">12 mois</option>
+                        </select>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-400">Frais admin: <span id="adminFee">0.00</span> VASS</span>
+                        <button type="submit" class="btn-primary">
+                            <i class="ph-fill ph-plus-circle mr-2"></i>
+                            Créer
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Active Savings Section -->
+            <section class="glass-effect">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold">Épargnes Actives</h2>
+                    <div class="flex space-x-2">
+                        <button id="sortByAmount" class="btn-secondary text-sm">
+                            <i class="ph-fill ph-sort-ascending mr-2"></i>Montant
+                        </button>
+                        <button id="sortByDuration" class="btn-secondary text-sm">
+                            <i class="ph-fill ph-timer mr-2"></i>Durée
+                        </button>
+                        <button id="sortByAPY" class="btn-secondary text-sm">
+                            <i class="ph-fill ph-chart-line-up mr-2"></i>APY
+                        </button>
+                    </div>
+                </div>
+
+                <div id="activeSavingsList" class="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar">
+                    <!-- Les épargnes actives seront injectées ici dynamiquement -->
+                    <div class="text-center text-gray-400 py-8">
+                        <i class="ph-fill ph-piggy-bank text-4xl mb-2"></i>
+                        <p>Aucune épargne active</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Sections Groupe et Rejoindre -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Create Group -->
+            <div class="glass-effect">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold">Créer un Groupe</h2>
+                    <i class="ph-fill ph-users-three text-primary-400 text-xl"></i>
+                </div>
+
+                <form id="createGroupForm" class="space-y-4">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Nom du Groupe</label>
+                        <input type="text" id="groupName"
+                            class="w-full bg-dark-900 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary-400"
+                            placeholder="Entrez le nom du groupe" required>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Montant Minimum Mensuel (BUSD)</label>
+                        <input type="number" id="minMonthlyAmount" min="5.05" step="0.01"
+                            class="w-full bg-dark-900 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary-400"
+                            placeholder="Minimum 5.05 BUSD" required>
+                        <small class="text-gray-500">Minimum 5.05 BUSD (5 BUSD après frais de 1%)</small>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Durée</label>
+                        <select id="duration"
+                            class="w-full bg-dark-900 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary-400" required>
+                            <option value="2592000">1 mois (30 jours)</option>
+                            <option value="5184000">2 mois (60 jours)</option>
+                            <option value="7776000">3 mois (90 jours)</option>
+                            <option value="15552000">6 mois (180 jours)</option>
+                            <option value="31104000">12 mois (360 jours)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Nombre maximum de membres</label>
+                        <select id="maxMembers"
+                            class="w-full bg-dark-900 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary-400" required>
+                            <option value="5">5 membres</option>
+                            <option value="6">6 membres</option>
+                            <option value="7">7 membres</option>
+                            <option value="8">8 membres</option>
+                            <option value="9">9 membres</option>
+                            <option value="10">10 membres</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary w-full justify-center">
+                        <i class="ph-fill ph-plus-circle mr-2"></i>
+                        Créer le Groupe
+                    </button>
+                </form>
+            </div>
+
+            <!-- Active Groups -->
+            <div class="glass-effect">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold">Groupes Actifs</h2>
+                    <div class="flex space-x-2">
+                        <button id="sortByMembers" class="btn-secondary text-sm">
+                            <i class="ph-fill ph-users-three mr-2"></i>Membres
+                        </button>
+                        <button id="sortByGroupAmount" class="btn-secondary text-sm">
+                            <i class="ph-fill ph-money mr-2"></i>Montant
+                        </button>
+                    </div>
+                </div>
+
+                <div id="activeGroupsList" class="space-y-4 max-h-[200px] overflow-y-auto custom-scrollbar">
+                    <div class="text-center text-gray-400 py-4">
+                        <i class="ph-fill ph-users-three text-2xl mb-2"></i>
+                        <p>Aucun groupe actif</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-6 border-t border-gray-700">
+                    <h3 class="text-lg font-semibold mb-4">Déposer dans un Groupe</h3>
+                    <form id="depositToGroupForm" class="space-y-4">
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2">ID du Groupe</label>
+                            <input type="text" id="depositGroupId"
+                                class="w-full bg-dark-900 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary-400"
+                                placeholder="Entrez l'ID du groupe">
+                        </div>
+
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2">Montant (USDT)</label>
+                            <div class="relative">
+                                <input type="number" id="depositAmount" min="0" step="0.01"
+                                    class="w-full bg-dark-900 border border-gray-700 rounded-lg pl-4 pr-20 py-2 focus:outline-none focus:border-primary-400"
+                                    placeholder="0.00">
+                                <button type="button" id="maxDepositAmount"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-primary-400 text-sm hover:text-primary-300">
+                                    MAX
+                                </button>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-primary w-full mt-6">
+                            <i class="ph-fill ph-money mr-2"></i>
+                            Déposer
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+                <!-- Charts and Groups Section -->
+                <section class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <!-- APY Chart -->
+                    <div class="glass-effect">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-xl font-bold">APY</h2>
+                            <span class="text-2xl font-bold text-primary-400" id="currentApyValue">10.5%</span>
+                        </div>
+                        <div class="h-64">
+                            <canvas id="apyChart"></canvas>
+                        </div>
+                    </div>
+        
+                    <!-- Join Group -->
+                    <div class="glass-effect">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-xl font-bold">Rejoindre un Groupe</h2>
+                            <i class="ph-fill ph-user-plus text-primary-400 text-xl"></i>
+                        </div>
+        
+                        <form id="joinGroupForm" class="space-y-4">
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">ID du Groupe</label>
+                                <input type="text" id="groupId" class="w-full bg-dark-900 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary-400" placeholder="Entrez l'ID du groupe">
+                            </div>
+        
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">Message (optionnel)</label>
+                                <textarea id="joinMessage" class="w-full bg-dark-900 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary-400" placeholder="Message pour les membres du groupe" rows="3"></textarea>
+                            </div>
+        
+                            <button type="submit" class="btn-primary w-full mt-6">
+                                <i class="ph-fill ph-user-plus mr-2"></i>
+                                Rejoindre le Groupe
+                            </button>
+                        </form>
+                    </div>
+                </section>
+        
+
+        <!-- Transaction History Section -->
+        <section class="glass-effect mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">Historique des Transactions</h2>
+                <div class="flex space-x-2">
+                    <button id="exportCSV" class="btn-secondary text-sm">
+                        <i class="ph-fill ph-file-csv mr-2"></i>CSV
+                    </button>
+                    <button id="exportPDF" class="btn-secondary text-sm">
+                        <i class="ph-fill ph-file-pdf mr-2"></i>PDF
+                    </button>
+                    <button id="filterTransactions" class="btn-secondary text-sm">
+                        <i class="ph-fill ph-funnel mr-2"></i>Filtrer
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left text-gray-400">
+                            <th class="pb-4">Date</th>
+                            <th class="pb-4">Type</th>
+                            <th class="pb-4">Montant</th>
+                            <th class="pb-4">Statut</th>
+                            <th class="pb-4">Hash</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsList" class="text-sm">
+                        <!-- Les transactions seront injectées ici dynamiquement -->
+                        <tr class="text-center text-gray-400">
+                            <td colspan="5" class="py-8">
+                                <i class="ph-fill ph-clock-counter-clockwise text-4xl mb-2"></i>
+                                <p>Aucune transaction</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- PancakeSwap Details Section -->
+        <section class="glass-effect mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex items-center space-x-3">
+                    <i class="ph-fill ph-cake text-2xl text-yellow-400"></i>
+                    <h2 class="text-xl font-bold">Détails PancakeSwap</h2>
+                </div>
+                <button onclick="refreshPancakeStats()" class="btn-secondary">
+                    <i class="ph-fill ph-arrows-clockwise mr-2"></i>
+                    Rafraîchir
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400">Récompenses/bloc</span>
+                    <span id="rewardPerBlock" class="font-medium">--.-- CAKE</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400">Total Staké</span>
+                    <span id="totalStaked" class="font-medium">--.-- CAKE</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400">Valeur Stakée</span>
+                    <span id="totalStakedValue" class="font-medium">$--.--</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400">Dernière mise à jour</span>
+                    <span id="lastUpdate" class="text-sm text-gray-500">--:--:--</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- APY Chart Section -->
+        <section class="glass-effect mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex items-center space-x-3">
+                    <i class="ph-fill ph-chart-line-up text-2xl text-green-400"></i>
+                    <h2 class="text-xl font-bold">Historique APY</h2>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="weeklyChart" class="btn-secondary active">7J</button>
+                    <button id="monthlyChart" class="btn-secondary">30J</button>
+                    <button id="yearlyChart" class="btn-secondary">1A</button>
+                </div>
+            </div>
+            <div class="w-full h-64">
+                <canvas id="apyChart"></canvas>
+            </div>
+        </section>
+
+        
+        
+
+        <!-- Widget Calculateur -->
+        <div class="fixed bottom-8 right-8 z-50">
+            <!-- Bouton calculateur -->
+            <button id="calculatorToggle" class="bg-primary-500 hover:bg-primary-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center animate-bounce">
+                <i class="ph-fill ph-calculator text-2xl"></i>
+            </button>
+
+            <!-- Modal calculateur -->
+            <div id="calculatorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+                <div class="bg-dark-800 rounded-lg p-6 w-full max-w-md mx-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-primary-400">Calculateur d'épargne</h3>
+                        <button id="closeCalculator" class="text-gray-400 hover:text-white">
+                            <i class="ph-fill ph-x-circle text-2xl"></i>
+                        </button>
+                    </div>
+                    
+                    <form id="calculatorForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-gray-300">Montant à épargner</label>
+                            <input type="number" id="calcAmount" class="w-full bg-dark-700 rounded p-2 text-white border border-primary-500/20" placeholder="0.00" min="0" step="0.01">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-gray-300">Durée (mois)</label>
+                            <input type="number" id="calcDuration" class="w-full bg-dark-700 rounded p-2 text-white border border-primary-500/20" placeholder="1" min="1" max="12">
+                        </div>
+                        <button type="submit" class="w-full bg-primary-500 hover:bg-primary-600 text-white rounded py-2 px-4 transition-colors flex items-center justify-center space-x-2">
+                            <i class="ph-fill ph-calculator text-xl"></i>
+                            <span>Calculer</span>
+                        </button>
+                    </form>
+
+                    <div id="calculatorResults" class="mt-4 p-4 bg-dark-700 rounded hidden">
+                        <h4 class="font-medium mb-2 text-primary-400">Résultats estimés</h4>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Montant total</span>
+                                <span id="totalAmount" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Récompenses</span>
+                                <span id="estimatedRewards" class="text-primary-400 font-medium">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const calculatorToggle = document.getElementById('calculatorToggle');
+                const calculatorModal = document.getElementById('calculatorModal');
+                const closeCalculator = document.getElementById('closeCalculator');
+                const calculatorForm = document.getElementById('calculatorForm');
+                const calculatorResults = document.getElementById('calculatorResults');
+
+                if (!calculatorToggle || !calculatorModal || !closeCalculator || !calculatorForm || !calculatorResults) {
+                    console.error('Éléments du calculateur non trouvés');
+                    return;
+                }
+
+                calculatorToggle.addEventListener('click', () => {
+                    calculatorModal.classList.remove('hidden');
+                });
+
+                closeCalculator.addEventListener('click', () => {
+                    calculatorModal.classList.add('hidden');
+                });
+
+                calculatorModal.addEventListener('click', (e) => {
+                    if (e.target === calculatorModal) {
+                        calculatorModal.classList.add('hidden');
+                    }
+                });
+
+                calculatorForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const amount = parseFloat(document.getElementById('calcAmount').value) || 0;
+                    const duration = parseInt(document.getElementById('calcDuration').value) || 1;
+                    
+                    const apy = 0.05; // 5% APY
+                    const totalAmount = amount;
+                    const rewards = amount * apy * (duration / 12);
+
+                    document.getElementById('totalAmount').textContent = totalAmount.toFixed(2) + ' VASS';
+                    document.getElementById('estimatedRewards').textContent = rewards.toFixed(2) + ' VASS';
+                    calculatorResults.classList.remove('hidden');
+                });
+            });
+        </script>
+
+        
+    </main> 
+</body>
+</html>
